@@ -1,5 +1,5 @@
 use mbedtls::ssl::config::{Endpoint, Preset, Transport};
-use mbedtls::ssl::{Config, Context, HandshakeContext};
+use mbedtls::ssl::{config::Config, Context, context::HandshakeContext};
 use mbedtls::Result;
 use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
@@ -28,8 +28,8 @@ pub mod server {
     }
 
     pub struct ServerTlsPskContext<'a> {
-        inner: Context<'a>,
-        _config: Pin<Box<Config<'a>>>,
+        inner: Context,
+        _config: Pin<Box<Config>>,
         _callback: Pin<Box<Callback>>,
         _rng: Pin<Box<Rng>>,
         _psk: Pin<Box<[u8; 16]>>,
@@ -75,26 +75,29 @@ pub mod server {
 #[cfg(not(target_env = "sgx"))]
 pub mod client {
     use super::*;
+    use std::sync::Arc;
 
-    pub fn config<'a: 'c, 'b: 'c, 'c>(rng: &'a mut Rng, psk: &'b [u8]) -> Result<Config<'c>> {
+    pub fn config<'a: 'c, 'b: 'c, 'c>(rng: Rng, _psk: &'b [u8]) -> Result<Config> {
         let mut config = Config::new(Endpoint::Client, Transport::Stream, Preset::Default);
-        config.set_rng(Some(&mut rng.inner));
-        config.set_psk(psk, "Client_identity")?;
+        let inner_arc = Arc::new(rng.inner);
+        config.set_rng(inner_arc);
+        /* config.set_psk(psk, "Client_identity")?; */
         Ok(config)
     }
 
-    pub fn context<'a>(config: &'a Config) -> Result<Context<'a>> {
-        Context::new(&config)
+    pub fn context<'a>(config: Config) -> Result<Context> {
+        let arc = Arc::new(config);
+        Ok(Context::new(arc))
     }
 
-    pub struct ClientTlsPskContext<'a> {
-        inner: Context<'a>,
-        _config: Pin<Box<Config<'a>>>,
-        _rng: Pin<Box<Rng<'a>>>,
+    pub struct ClientTlsPskContext {
+        inner: Context,
+        _config: Pin<Box<Config>>,
+        _rng: Pin<Box<Rng>>,
         _psk: Pin<Box<[u8; 16]>>,
     }
 
-    impl<'a> ClientTlsPskContext<'a> {
+    impl<'a> ClientTlsPskContext {
         pub fn new<'b: 'a>(psk: [u8; 16]) -> Self {
             unsafe {
                 let mut rng = Box::pin(Rng::new().unwrap());
@@ -103,7 +106,7 @@ pub mod client {
                 let rng_ptr: *mut _ = &mut *rng;
                 let config = Box::pin(config(&mut *rng_ptr, &*psk_ptr).unwrap());
                 let config_ptr: *const _ = &*config;
-                let context = context(&*config_ptr).unwrap();
+                let context = context(config).unwrap();
                 Self {
                     inner: context,
                     _config: config,
@@ -114,14 +117,14 @@ pub mod client {
         }
     }
 
-    impl<'a> Deref for ClientTlsPskContext<'a> {
-        type Target = Context<'a>;
+    impl Deref for ClientTlsPskContext {
+        type Target = Context;
         fn deref(&self) -> &Self::Target {
             &self.inner
         }
     }
 
-    impl<'a> DerefMut for ClientTlsPskContext<'a> {
+    impl DerefMut for ClientTlsPskContext {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.inner
         }

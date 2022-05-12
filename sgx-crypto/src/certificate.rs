@@ -1,12 +1,12 @@
 use super::digest::{sha256, SHA256_TYPE};
-use mbedtls::x509::Certificate;
+use mbedtls::{x509::Certificate, alloc::{Box, List}};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
 #[derive(Debug)]
 pub struct X509Cert {
-    inner: Certificate,
+    inner: Box<Certificate>,
 }
 
 impl X509Cert {
@@ -37,7 +37,9 @@ impl X509Cert {
     }
 
     pub fn verify_this_certificate(&mut self, trust_ca: &mut Self) -> super::Result<()> {
-        self.inner.verify(&mut trust_ca.inner, None)?;
+        let cert = List { inner : Some(self.inner.clone()) };
+        let ca = List { inner : Some(trust_ca.inner.clone()) };
+        Certificate::verify(&cert, &ca, None)?;
         Ok(())
     }
 
