@@ -11,23 +11,28 @@ pub type Callback = Box<dyn FnMut(&mut HandshakeContext, &str) -> Result<()>>;
 #[cfg(target_env = "sgx")]
 pub mod server {
     use super::*;
+    use std::sync::Arc;
     pub fn callback(psk: &[u8]) -> Callback {
-        let psk = psk.to_owned();
-        Box::new(move |ctx: &mut HandshakeContext, _: &str| ctx.set_psk(psk.as_ref()))
+        let _psk = psk.to_owned();
+        /* Box::new(move |ctx: &mut HandshakeContext, _: &str| ctx.set_psk(psk.as_ref())) */
+        Box::new(move |_ctx: &mut HandshakeContext, _ : &str| Ok(()))
     }
 
-    pub fn config<'a: 'c, 'b: 'c, 'c>(rng: &'a mut Rng, callback: &'b mut Callback) -> Config<'c> {
+    pub fn config(rng: Rng, _callback: &mut Callback) -> Config {
         let mut config = Config::new(Endpoint::Server, Transport::Stream, Preset::Default);
-        config.set_rng(Some(&mut rng.inner));
-        config.set_psk_callback(callback);
+        let arc = Arc::new(rng.inner);
+        /* config.set_rng(Some(&mut rng.inner)); */
+        config.set_rng(arc);
+        /* config.set_psk_callback(callback); */
         config
     }
 
-    pub fn context<'a>(config: &'a Config) -> Result<Context<'a>> {
-        Context::new(&config)
+    pub fn context(config: Config) -> Result<Context> {
+        let arc = Arc::new(config);
+        Ok(Context::new(arc))
     }
 
-    pub struct ServerTlsPskContext<'a> {
+    pub struct ServerTlsPskContext {
         inner: Context,
         _config: Pin<Box<Config>>,
         _callback: Pin<Box<Callback>>,
@@ -35,37 +40,36 @@ pub mod server {
         _psk: Pin<Box<[u8; 16]>>,
     }
 
-    impl<'a> ServerTlsPskContext<'a> {
-        pub fn new<'b: 'a>(psk: [u8; 16]) -> Self {
-            unsafe {
-                let mut rng = Box::pin(Rng::new());
-                let psk = Box::pin(psk);
-                let psk_ptr: *const _ = &*psk;
-                let mut callback = Box::pin(callback(&*psk_ptr));
-                let rng_ptr: *mut _ = &mut *rng;
-                let callback_ptr: *mut _ = &mut *callback;
-                let config = Box::pin(config(&mut *rng_ptr, &mut *callback_ptr));
-                let config_ptr: *const _ = &*config;
-                let context = context(&*config_ptr).unwrap();
-                Self {
-                    inner: context,
-                    _config: config,
-                    _callback: callback,
-                    _rng: rng,
-                    _psk: psk,
-                }
+    impl ServerTlsPskContext {
+        pub fn new(psk: [u8; 16]) -> Self {
+            let rng = Rng::new();
+            let mut callback = callback(&psk);
+            let conf = config(rng, &mut callback);
+            let context = context(conf).unwrap();
+
+            // because config is not clone
+            let rng = Rng::new();
+            let conf = config(rng, &mut callback);
+            let rng = Rng::new();
+
+            Self {
+                inner: context,
+                _config: Box::pin(conf),
+                _callback: Box::pin(callback),
+                _rng: Box::pin(rng),
+                _psk: Box::pin(psk),
             }
         }
     }
 
-    impl<'a> Deref for ServerTlsPskContext<'a> {
-        type Target = Context<'a>;
+    impl<'a> Deref for ServerTlsPskContext {
+        type Target = Context;
         fn deref(&self) -> &Self::Target {
             &self.inner
         }
     }
 
-    impl<'a> DerefMut for ServerTlsPskContext<'a> {
+    impl<'a> DerefMut for ServerTlsPskContext {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.inner
         }
