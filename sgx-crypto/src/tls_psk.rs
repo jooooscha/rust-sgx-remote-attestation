@@ -99,20 +99,24 @@ pub mod client {
 
     impl<'a> ClientTlsPskContext {
         pub fn new<'b: 'a>(psk: [u8; 16]) -> Self {
-            unsafe {
-                let mut rng = Box::pin(Rng::new().unwrap());
-                let psk = Box::pin(psk);
-                let psk_ptr: *const _ = &*psk;
-                let rng_ptr: *mut _ = &mut *rng;
-                let config = Box::pin(config(&mut *rng_ptr, &*psk_ptr).unwrap());
-                let config_ptr: *const _ = &*config;
-                let context = context(config).unwrap();
-                Self {
-                    inner: context,
-                    _config: config,
-                    _rng: rng,
-                    _psk: psk,
-                }
+            /* let mut rng = Box::pin(Rng::new().unwrap()); */
+            /* let psk = Box::pin(psk); */
+            /* let psk_ptr: *const _ = &*psk; */
+            /* let rng_ptr: *mut _ = &mut *rng; */
+            /* let config = Box::pin(config(rng, &*psk_ptr).unwrap()); */
+            /* let config_ptr: *const _ = &*config; */
+            let rng = Rng::new().unwrap();
+            let conf = config(rng, &psk).unwrap();
+            let context = context(conf).unwrap();
+            // because Config is not clone
+            let rng = Rng::new().unwrap();
+            let conf = config(rng, &psk).unwrap();
+            let rng = Rng::new().unwrap();
+            Self {
+                inner: context,
+                _config: Box::pin(conf),
+                _rng: Box::pin(rng),
+                _psk: Box::pin(psk),
             }
         }
     }

@@ -37,8 +37,12 @@ impl X509Cert {
     }
 
     pub fn verify_this_certificate(&mut self, trust_ca: &mut Self) -> super::Result<()> {
-        let cert = List { inner : Some(self.inner.clone()) };
-        let ca = List { inner : Some(trust_ca.inner.clone()) };
+        let mut cert = List::<Certificate>::new();
+        cert.push(self.inner.clone());
+        let mut ca = List::<Certificate>::new();
+        ca.push(trust_ca.inner.clone());
+        /* let cert = List { inner : Some(self.inner.clone()) };
+         * let ca = List { inner : Some(trust_ca.inner.clone()) }; */
         Certificate::verify(&cert, &ca, None)?;
         Ok(())
     }

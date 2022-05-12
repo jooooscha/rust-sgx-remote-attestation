@@ -28,12 +28,10 @@ mod inner {
             /* let entropy_ptr: *mut _ = &mut *entropy; */
             /* let entropy_ptr: Arc<OsEntropy> = Arc::new(*entropy); */
             let entropy_ptr: Arc<OsEntropy> = Arc::new(OsEntropy::new());
-            unsafe {
-                Ok(Self {
-                    _entropy: entropy,
-                    inner: mbedtls::rng::CtrDrbg::new(entropy_ptr, None)?,
-                })
-            }
+            Ok(Self {
+                _entropy: entropy,
+                inner: mbedtls::rng::CtrDrbg::new(entropy_ptr, None)?,
+            })
         }
     }
 }
