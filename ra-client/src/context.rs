@@ -146,7 +146,7 @@ impl ClientRaContext {
         enclave_stream.write_all(quote_info.target_info())?;
         enclave_stream.flush()?;
         let mut report = vec![0u8; Report::UNPADDED_SIZE];
-        enclave_stream.read_exact(&mut report[..])?;
+        enclave_stream.read_exact(&mut report[..]).expect("Failed to read of size Report::UNPADDED_SIZE");
 
         // Get a quote and QE report from QE and send them to enclave
         let nonce = vec![0u8; 16]; // TODO change this

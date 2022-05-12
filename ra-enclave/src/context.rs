@@ -31,7 +31,7 @@ impl EnclaveRaContext {
         mut self,
         mut client_stream: &mut (impl Read + Write),
     ) -> EnclaveRaResult<(MacTag, MacTag)> {
-        let (sk, mk) = self.process_msg_2(client_stream).unwrap();
+        let (sk, mk) = self.process_msg_2(client_stream)?;
         let msg4: RaMsg4 = bincode::deserialize_from(&mut client_stream).unwrap();
         if !msg4.is_enclave_trusted {
             return Err(EnclaveRaError::EnclaveNotTrusted);
@@ -64,8 +64,8 @@ impl EnclaveRaContext {
             .key_exchange
             .take()
             .unwrap()
-            .verify_and_derive(&msg2.g_b, &msg2.sign_gb_ga, &mut self.sp_vkey, &mut rng)
-            .unwrap();
+            .verify_and_derive(&msg2.g_b, &msg2.sign_gb_ga, &mut self.sp_vkey, &mut rng)?;
+
         let mut kdk_cmac = Cmac::new(&kdk)?;
         let (smk, sk, mk, vk) = derive_secret_keys(&mut kdk_cmac)?;
         let mut smk = Cmac::new(&smk)?;
