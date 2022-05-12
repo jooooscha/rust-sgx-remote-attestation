@@ -17,12 +17,12 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
-pub struct SpRaContext<'a> {
+pub struct SpRaContext {
     config: SpConfig,
     sigstruct: sigstruct::Sigstruct,
     ias_client: IasClient,
     sp_private_key: SigningKey,
-    rng: Rng<'a>,
+    rng: Rng,
     key_exchange: Option<OneWayAuthenticatedDHKE>,
     g_a: Option<DHKEPublicKey>,
     verification_digest: Option<Sha256Digest>,
@@ -30,7 +30,7 @@ pub struct SpRaContext<'a> {
     sk_mk: Option<(MacTag, MacTag)>,
 }
 
-impl<'a> SpRaContext<'a> {
+impl SpRaContext {
     pub fn init(mut config: SpConfig) -> SpRaResult<Self> {
         assert!(config.linkable, "Only Linkable Quote supported");
         assert!(!config.random_nonce, "Random nonces not supported");
