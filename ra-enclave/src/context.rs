@@ -82,6 +82,8 @@ impl EnclaveRaContext {
 
         // Obtain Quote
         let quote = Self::get_quote(&verification_digest[..], client_stream)?;
+        println!("[Key enclave] quote: {:?}", &quote[176..208]);
+
 
         // Send MAC for msg3 to client
         let msg3 = RaMsg3::new(&mut smk, g_a, None, quote)?;
