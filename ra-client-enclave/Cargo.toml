@@ -1,5 +1,5 @@
 [package]
-name = "ra-client"
+name = "ra-client-enclave"
 version = "0.1.0"
 authors = ["Natnatee Dokmai <ndokmai@indiana.edu>"]
 edition = "2018"
@@ -14,6 +14,8 @@ aesm-client = { path = "../../rust-sgx/aesm-client/" }
 sgx-isa = "0.3"
 ra-common = { path = "../ra-common" }
 sgx-crypto = { path = "../sgx-crypto" }
+serde_json = "*"
+byteorder = "*"
 
 [[example]]
 name = "tls-client"

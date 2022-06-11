@@ -219,18 +219,19 @@ impl SpRaContext {
         let isvprodid = (&msg3.quote[304..306]).read_u16::<LittleEndian>().unwrap();
         let isvsvn = (&msg3.quote[306..308]).read_u16::<LittleEndian>().unwrap();
 
-        println!("msg3: {:?}\nself: {:?}", mrenclave, self.sigstruct.enclavehash.as_ref());
-        println!();
-        println!("msg3: {:?}\nself: {:?}", mrsigner, sha256(self.sigstruct.modulus.as_ref())?.as_ref());
+        /* println!("msg3: {:?}\nself: {:?}", mrenclave, self.sigstruct.enclavehash.as_ref());
+         * println!();
+         * println!("msg3: {:?}\nself: {:?}", mrsigner, sha256(self.sigstruct.modulus.as_ref())?.as_ref()); */
         /* println!("{:?}", (isvprodid, self.sigstruct.isvprodid));
          * println!("{:?}", (isvsvn, self.sigstruct.isvsvn)); */
 
         if mrenclave != self.sigstruct.enclavehash.as_ref()
-            || mrsigner != sha256(self.sigstruct.modulus.as_ref())?.as_ref()
+            /* || mrsigner != sha256(self.sigstruct.modulus.as_ref())?.as_ref() */
             || isvprodid != self.sigstruct.isvprodid
             || isvsvn != self.sigstruct.isvsvn
         {
             return Err(SpRaError::SigstructMismatched); // WARNING:
+            /* println!("{:?}", SpRaError::SigstructMismatched); // WARNING: */
         }
 
         // Make sure the enclave is not in debug mode in production

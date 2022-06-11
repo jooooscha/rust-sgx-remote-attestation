@@ -32,7 +32,7 @@ impl EnclaveRaContext {
         mut client_stream: &mut (impl Read + Write),
     ) -> EnclaveRaResult<(MacTag, MacTag)> {
         let (sk, mk) = self.process_msg_2(client_stream)?;
-        let msg4: RaMsg4 = bincode::deserialize_from(&mut client_stream).unwrap();
+        let msg4: RaMsg4 = bincode::deserialize_from(&mut client_stream).map_err(|_| EnclaveRaError::EnclaveNotTrusted)?;
         if !msg4.is_enclave_trusted {
             return Err(EnclaveRaError::EnclaveNotTrusted);
         }
@@ -82,8 +82,6 @@ impl EnclaveRaContext {
 
         // Obtain Quote
         let quote = Self::get_quote(&verification_digest[..], client_stream)?;
-        println!("[Key enclave] quote: {:?}", &quote[176..208]);
-
 
         // Send MAC for msg3 to client
         let msg3 = RaMsg3::new(&mut smk, g_a, None, quote)?;

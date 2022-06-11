@@ -1,6 +1,6 @@
 use crate::error::ClientRaError;
 use crate::ClientRaResult;
-use aesm_client::{AesmClient, QuoteInfo, QuoteType};
+use aesm_client::{AesmClient, QuoteInfo, QuoteType, QuoteResult};
 use ra_common::msg::{Gid, Quote, RaMsg0, RaMsg1, RaMsg2, RaMsg3, RaMsg4};
 use sgx_crypto::cmac::MacTag;
 use sgx_crypto::key_exchange::DHKEPublicKey;
@@ -8,34 +8,25 @@ use sgx_isa::Report;
 use std::convert::TryInto;
 use std::io::{Read, Write};
 use std::mem::size_of;
+use std::io::{BufReader, BufRead};
+use std::net::TcpStream;
+use serde_json;
+use byteorder::*;
 
-#[cfg(target_env = "sgx")]
 use aesm_client::sgx::AesmClientExt;
 
 pub struct ClientRaContext {
-    pub aesm_client: AesmClient,
+    /* pub aesm_client: AesmClient, */
+    /* pub aesm_stream: TcpStream, */
     pub quote_info: QuoteInfo,
     pub g_a: Option<DHKEPublicKey>,
 }
 
 impl ClientRaContext {
-    #[cfg(not(target_env = "sgx"))]
     pub fn init() -> ClientRaResult<Self> {
-        let aesm_client = AesmClient::new();
-        let quote_info = aesm_client.init_quote()?;
-        Ok(Self {
-            aesm_client,
-            quote_info,
-            g_a: None,
-        })
-    }
+        let quote_info = read_init();
 
-    #[cfg(target_env = "sgx")]
-    pub fn init(stream: std::net::TcpStream) -> ClientRaResult<Self> {
-        let aesm_client = AesmClient::new(stream);
-        let quote_info = aesm_client.init_quote()?;
         Ok(Self {
-            aesm_client,
             quote_info,
             g_a: None,
         })
@@ -89,7 +80,7 @@ impl ClientRaContext {
             eprintln!("MSG4 received");
         }
 
-        bincode::serialize_into(&mut enclave_stream, &msg4)?;
+        bincode::serialize_into(&mut enclave_stream, &msg4).unwrap();
         sp_stream.flush()?;
 
         if !msg4.is_enclave_trusted {
@@ -134,7 +125,7 @@ impl ClientRaContext {
         let spid = (&msg2.spid[..]).to_owned();
 
         // Get a Quote and send it to enclave to sign
-        let quote = Self::get_quote(&self.aesm_client, spid, sig_rl, enclave_stream)?;
+        let quote = Self::get_quote(/*&self.aesm_client,*/spid, sig_rl, enclave_stream)?;
 
         // Read MAC for msg3 from enclave
         let mut mac = [0u8; size_of::<MacTag>()];
@@ -150,12 +141,20 @@ impl ClientRaContext {
 
     /// Get a Quote and send it to enclave to sign
     pub fn get_quote(
-        aesm_client: &AesmClient,
+        /* aesm_client: &AesmClient, */
         spid: Vec<u8>,
         sig_rl: Vec<u8>,
         enclave_stream: &mut (impl Read + Write),
     ) -> ClientRaResult<Quote> {
-        let quote_info = aesm_client.init_quote()?;
+        /* let quote_info = aesm_client.init_quote()?; */
+        /* let quote_stream =  */
+        /* let mut aesm_stream = BufReader::new(TcpStream::connect("aesm-init")?);
+         * let mut quote_info = String::new();
+         * aesm_stream.read_line(&mut quote_info).unwrap();
+         * println!("got quote_info: {:?}", quote_info);
+         * let quote_info: QuoteInfo = serde_json::from_str(&quote_info).unwrap(); */
+
+        let quote_info = read_init();
 
         // Get report for local attestation with QE from enclave
         enclave_stream.write_all(quote_info.target_info())?;
@@ -165,13 +164,68 @@ impl ClientRaContext {
 
         // Get a quote and QE report from QE and send them to enclave
         let nonce = vec![0u8; 16]; // TODO change this
-        let _quote = aesm_client.get_quote(report, spid, sig_rl, QuoteType::Linkable, nonce)?;
+
+        /* let _quote = aesm_client.get_quote(report, spid, sig_rl, QuoteType::Linkable, nonce)?; */
+        /* let mut aesm_stream = BufReader::new(TcpStream::connect("aesm-get_quote")?);
+         * let mut _quote = String::new();
+         * aesm_stream.read_line(&mut _quote).unwrap();
+         * println!("got quote_info: {:?}", _quote);
+         * let mut _quote: QuoteResult = serde_json::from_str(&_quote).unwrap(); */
+
+        let _quote: QuoteResult = read_get_quote(report, spid, sig_rl);
+
         enclave_stream.write_all(_quote.quote())?;
         enclave_stream.write_all(_quote.qe_report())?;
         enclave_stream.flush()?;
 
         let mut quote = [0u8; size_of::<Quote>()];
         quote.copy_from_slice(_quote.quote());
+
+
         Ok(quote)
     }
+}
+
+fn read_init() -> QuoteInfo {
+    let stream = TcpStream::connect("aesm-init");
+    let stream = stream.unwrap();
+    let mut aesm_stream = BufReader::new(stream);
+
+    /* let mut buf = [0; 30].to_vec();
+     * aesm_stream.read_exact(&mut buf); */
+
+    let mut buf = [0; 1118].to_vec();
+    aesm_stream.read_exact(&mut buf);
+    let quote_info = String::from_utf8(buf).unwrap();
+
+    serde_json::from_str(&quote_info).unwrap()
+}
+
+fn read_get_quote(
+        report: Vec<u8>,
+        spid: Vec<u8>,
+        sig_rl: Vec<u8>,
+    ) -> QuoteResult {
+    let stream = TcpStream::connect("aesm-get_quote");
+    let mut stream = stream.unwrap();
+
+    /* let mut aesm_stream = BufRer::new(stream); */
+
+    println!("report: {:?}", report);
+    stream.write_all(&report);
+    stream.write_all(b"\n");
+    println!("spid: {:?}", spid);
+    stream.write_all(&spid);
+    stream.write_all(&sig_rl);
+    println!("after written");
+
+    /* let mut buf = [0; 30].to_vec();
+     * aesm_stream.read_exact(&mut buf); */
+
+    let mut buf = [0; 1118].to_vec();
+    stream.read_exact(&mut buf);
+    let quote_result = String::from_utf8(buf).unwrap();
+    println!("quote_result: {:?}", quote_result);
+
+    serde_json::from_str(&quote_result).unwrap()
 }
