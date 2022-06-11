@@ -34,9 +34,10 @@ impl DHKE {
     ) -> super::Result<KDK> {
         let mut ikm = vec![0; SECRET_SHARE_LEN];
         let ecgroup = self.inner.ec_group()?;
+        let bin = EcPoint::from_binary(&ecgroup, &peer_public_key[..])?;
         let peer_public_key = Pk::public_from_ec_components(
             ecgroup.clone(),
-            EcPoint::from_binary(&ecgroup, &peer_public_key[..])?,
+            bin,
         )?;
         let len = self
             .inner

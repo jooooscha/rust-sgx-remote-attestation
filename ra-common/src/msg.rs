@@ -29,7 +29,7 @@ pub struct RaMsg1 {
     pub g_a: DHKEPublicKey,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct RaMsg2 {
     pub g_b: DHKEPublicKey,
     pub spid: Spid,

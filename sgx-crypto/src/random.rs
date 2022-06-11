@@ -15,22 +15,23 @@ mod inner {
 #[cfg(not(target_env = "sgx"))]
 mod inner {
     use mbedtls::rng::OsEntropy;
+    use std::sync::Arc;
     use std::pin::Pin;
-    pub struct Rng<'a> {
-        pub inner: mbedtls::rng::CtrDrbg<'a>,
-        _entropy: Pin<Box<OsEntropy<'a>>>,
+    pub struct Rng {
+        pub inner: mbedtls::rng::CtrDrbg,
+        _entropy: Pin<Box<OsEntropy>>,
     }
 
-    impl<'a> Rng<'a> {
+    impl Rng {
         pub fn new() -> super::super::Result<Self> {
-            let mut entropy = Box::pin(OsEntropy::new());
-            let entropy_ptr: *mut _ = &mut *entropy;
-            unsafe {
-                Ok(Self {
-                    _entropy: entropy,
-                    inner: mbedtls::rng::CtrDrbg::new(&mut *entropy_ptr, None)?,
-                })
-            }
+            let entropy = Box::pin(OsEntropy::new());
+            /* let entropy_ptr: *mut _ = &mut *entropy; */
+            /* let entropy_ptr: Arc<OsEntropy> = Arc::new(*entropy); */
+            let entropy_ptr: Arc<OsEntropy> = Arc::new(OsEntropy::new());
+            Ok(Self {
+                _entropy: entropy,
+                inner: mbedtls::rng::CtrDrbg::new(entropy_ptr, None)?,
+            })
         }
     }
 }
